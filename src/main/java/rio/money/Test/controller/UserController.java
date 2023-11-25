@@ -1,6 +1,7 @@
 package rio.money.Test.controller;
 
 import jakarta.servlet.http.HttpSession;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
+@Slf4j
 public class UserController {
 
     private static final Map<String, User> userMap = new HashMap<>();
@@ -39,9 +41,12 @@ public class UserController {
     @PostMapping("/login")
     public ApiResponse login(@RequestBody User user) {
         String username = user.getUsername();
-        String password = user.getPassword();
+        String password = user.getPasscode();
 
-        if (userMap.containsKey(username) && userMap.get(username).getPassword().equals(password)) {
+        log.info(userMap.toString());
+        User temp = userMap.get(username);
+        log.info(temp.toString());
+        if (userMap.containsKey(username) && userMap.get(username).getPasscode().equals(password)) {
 
             return new ApiResponse("success", null);
         } else {
@@ -49,7 +54,7 @@ public class UserController {
         }
     }
 
-    @GetMapping("/get")
+    @GetMapping("/get/users")
     public ApiResponse getUsers() {
         List<String> usernames = new ArrayList<>(userMap.keySet());
         return new ApiResponse("success", usernames);
@@ -83,13 +88,23 @@ public class UserController {
         if (!userMap.containsKey(fromUser) || !userMap.containsKey(toUser)) {
             return new ApiResponse("failure", "Invalid user(s).");
         }
-
+        String key = fromUser+"-"+toUser;
+        String reverse = toUser+"-"+fromUser;
         // Simulate sending the text message
-        if (!unreadMessages.containsKey(toUser)) {
-            unreadMessages.put(toUser, new ArrayList<>());
-        }
-        unreadMessages.get(toUser).add(fromUser + ": " + text);
 
+        if(unreadMessages.containsKey(key)){
+            unreadMessages.get(key).add(fromUser + ": " + text);
+            return new ApiResponse("success", null);
+        }
+        if(unreadMessages.containsKey(reverse)){
+            unreadMessages.get(reverse).add(fromUser + ": " + text);
+            return new ApiResponse("success", null);
+        }
+        if (!unreadMessages.containsKey(key)) {
+            unreadMessages.put(key, new ArrayList<>());
+        }
+
+        unreadMessages.get(key).add(fromUser + ": " + text);
         return new ApiResponse("success", null);
     }
 
@@ -97,17 +112,22 @@ public class UserController {
     public ApiResponse getChatHistory(@RequestBody Map<String, String> requestBody) {
         String user = requestBody.get("user");
         String friend = requestBody.get("friend");
-
+        String key =  user+ "-" + friend;
+        String reverseKey = friend + "-" + user;
         if (!userMap.containsKey(user) || !userMap.containsKey(friend)) {
             return new ApiResponse("failure", "Invalid user(s).");
         }
 
         List<String> chatHistory = new ArrayList<>();
-        if (unreadMessages.containsKey(user)) {
-            for (String message : unreadMessages.get(user)) {
-                if (message.startsWith(friend + ":") || message.startsWith(user + ":")) {
-                    chatHistory.add(message);
-                }
+        String msgKey = "";
+        if (unreadMessages.containsKey(key)) {
+            msgKey = key;
+        } else if (unreadMessages.containsKey(reverseKey)){
+            msgKey = reverseKey;
+        }
+        for (String message : unreadMessages.get(msgKey)) {
+            if (message.startsWith(friend + ":") || message.startsWith(user + ":")) {
+                chatHistory.add(message);
             }
         }
 
